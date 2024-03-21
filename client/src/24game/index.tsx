@@ -3,45 +3,45 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import Flex from '../Components/Flex';
 
-const socket = io('http://192.168.1.149:8000'); // Adjust this URL to your server's address
+const socket = io('http://10.0.0.180:8000'); // Adjust this URL to your server's address
 
 const _24game = () => {
   const [equation, setEquation] = useState<string>('');
+  const [editUsernameValue, setEditUsernameValue] = useState<string>('');
   const [question, setQuestion] = useState<number[]>([]);
   const [leaderboards, setLeaderboards] = useState<any[]>([]);
   const [socketId, setSocketId] = useState<string>('NULL');
   const [error, setError] = useState<string>('');
   const [gaveUp, setGaveUp] = useState(false);
+  const [showEditUsernameModal, setShowEditUsernameModal] = useState(false);
 
   const [prev, setPrev] = useState<{ prevAnswer: string; prevWinner: string } | null>(null);
 
   const STATE = question?.length === 0 ? 'WAIT' : 'PLAY';
 
-  useEffect(() => {
-    socket.on('connect', () => {
-      console.log('connecting');
-      setSocketId(socket.id);
-    });
-    socket.on('new question', (msg) => {
-      setGaveUp(false);
-      setQuestion(msg.numbers);
-      setPrev({ prevAnswer: msg.prevAnswer, prevWinner: msg.prevWinner });
-      setEquation('');
-    });
-    socket.on('get writings', () => {
-      console.log('send writing', equation);
-      submitWriting();
-    });
-    socket.on('leaderboards', (msg) => {
-      setLeaderboards(msg);
-    });
-    socket.on('wrong answer', (msg) => {
-      setError(msg);
-    });
-    socket.on('given up', () => {
-      setGaveUp(true);
-    });
-  }, []);
+  socket.on('connect', () => {
+    console.log('connecting');
+    setSocketId(socket.id);
+  });
+  socket.on('new question', (msg) => {
+    setGaveUp(false);
+    setQuestion(msg.numbers);
+    setPrev({ prevAnswer: msg.prevAnswer, prevWinner: msg.prevWinner });
+    setEquation('');
+    setError('');
+  });
+  socket.on('get writings', () => {
+    submitWriting();
+  });
+  socket.on('leaderboards', (msg) => {
+    setLeaderboards(msg);
+  });
+  socket.on('wrong answer', (msg) => {
+    setError(msg);
+  });
+  socket.on('given up', () => {
+    setGaveUp(true);
+  });
 
   const submitEquation = () => {
     console.log('eq', equation);
@@ -56,45 +56,143 @@ const _24game = () => {
     socket.emit('send writings', equation);
   };
 
-  useEffect(() => {
-    console.log(prev);
-  });
-
   return (
     <>
-      <div style={{ position: 'absolute', margin: 20 }}>You are {socketId}</div>
-      <Flex center='both' direction='column' style={{ position: 'absolute', right: 100 }}>
-        <h1>Leaderboards</h1>
-        <table
+      {/* edit username modal */}
+      {showEditUsernameModal && (
+        <Flex
+          center='both'
           style={{
-            borderCollapse: 'collapse',
+            position: 'absolute',
+            zIndex: 100,
             width: '100%',
-            textAlign: 'center',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+          }}
+          onClick={() => {
+            setShowEditUsernameModal(false);
           }}
         >
-          <tr>
-            {STATE === 'WAIT' && <th>Previous Answers</th>}
-            <th>Username</th>
-            <th>Score</th>
-          </tr>
-          {leaderboards.map((entry, index) => {
-            const readyString = STATE === 'WAIT' ? (entry.ready ? '(Ready)' : '(Not Ready)') : null;
-            return (
-              <tr>
-                {STATE === 'WAIT' && <td>{entry.prevWriting}</td>}
-                <td style={{ color: prev?.prevWinner === entry.id ? 'green' : 'unset' }}>
-                  {entry.username} ({entry.id}) {readyString}
-                </td>
-                <td>{entry.score}</td>
-              </tr>
-            );
-          })}
-        </table>
+          <div
+            style={{
+              position: 'absolute',
+              justifyContent: 'space-between',
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <Flex
+              direction='column'
+              center='both'
+              style={{
+                backgroundColor: 'white',
+                boxShadow: '5px 5px 5px',
+                padding: '20px',
+                borderRadius: '5px',
+              }}
+              gap={20}
+            >
+              <Flex direction='column' center='both' gap={10}>
+                Change Username
+                <Input
+                  autoFocus
+                  placeholder={socketId}
+                  value={editUsernameValue}
+                  onChange={(event: any) => {
+                    setEditUsernameValue(event.target.value);
+                  }}
+                  onKeyDown={(event: any) => {
+                    if (event.key === 'Enter' && editUsernameValue.length > 0) {
+                      socket.emit('change username', editUsernameValue);
+                      setShowEditUsernameModal(false);
+                    }
+                  }}
+                  style={{
+                    width: 200,
+                  }}
+                />
+              </Flex>
+              <Flex center='both' gap={10}>
+                <Button
+                  variant='contained'
+                  onClick={() => {
+                    setShowEditUsernameModal(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant='contained'
+                  color='primary'
+                  onClick={() => {
+                    socket.emit('change username', editUsernameValue);
+                    setShowEditUsernameModal(false);
+                  }}
+                >
+                  Save
+                </Button>
+              </Flex>
+            </Flex>
+          </div>
+        </Flex>
+      )}
+
+      {/* header  */}
+      <Flex
+        style={{
+          position: 'absolute',
+          justifyContent: 'space-between',
+          left: 20,
+          right: 20,
+          top: 20,
+        }}
+      >
+        <div>You are {socketId}</div>
+        {/* <div>hi</div> */}
+        <Flex center='secondary' direction='column' gap={10}>
+          <div style={{ fontSize: 36, fontWeight: 'bold' }}>Leaderboards</div>
+          <table
+            style={{
+              borderCollapse: 'collapse',
+              textAlign: 'center',
+            }}
+          >
+            <tr>
+              {STATE === 'WAIT' && <th>Previous Answers</th>}
+              <th>Username</th>
+              <th>Score</th>
+            </tr>
+            {leaderboards.map((entry, index) => {
+              const readyString =
+                STATE === 'WAIT' ? (entry.ready ? '(Ready)' : '(Not Ready)') : null;
+              const editUsernameString = STATE === 'WAIT' && entry.id === socketId ? '✎' : null;
+              return (
+                <tr>
+                  {STATE === 'WAIT' && <td>{entry.prevWriting}</td>}
+                  <td
+                    style={{ color: prev?.prevWinner === entry.id ? 'green' : 'unset' }}
+                    onClick={() => {
+                      if (entry.id === socketId && STATE === 'WAIT') {
+                        setShowEditUsernameModal(true);
+                      }
+                    }}
+                  >
+                    {editUsernameString} {entry.username} ({entry.id}) {readyString}
+                  </td>
+                  <td>{entry.score}</td>
+                </tr>
+              );
+            })}
+          </table>
+        </Flex>
       </Flex>
+
+      {/* input area  */}
       <Flex center='both' gap={100} direction='column' style={{ width: '100%', height: '100%' }}>
         {STATE === 'PLAY' ? (
-          <Flex direction='column'>
-            <h1>{question.join(' ')}</h1>
+          <Flex direction='column' gap={8}>
+            <div style={{ fontSize: 36, fontWeight: 'bold' }}>{question.join(' ')}</div>
             <Flex gap={8}>
               <Flex direction='column' gap={4}>
                 {error && (

@@ -58,8 +58,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('change username', (username) => {
+    users.set(socket.id, { ...users.get(socket.id), username: username });
+    io.emit(
+      'leaderboards',
+      [...users.values()].sort((a, b) => b.score - a.score)
+    );
+  });
+
   socket.on('submit', (answer) => {
-    // make sure answer contains each number in numbers array excatly once
+    // make sure answer contains each number in numbers array exactly once
     console.log(answer);
     const answerNumbers = (answer.match(/\d/g) ?? []).sort();
     const numbersSorted = [...numbers.sort()];
@@ -74,7 +82,6 @@ io.on('connection', (socket) => {
     let value;
     try {
       value = Parser.evaluate(answer);
-      console.log(value);
     } catch (e) {
       socket.emit('wrong answer', 'Badly formed equation');
       return;
@@ -98,11 +105,10 @@ io.on('connection', (socket) => {
         prevAnswer: answer,
         prevWinner: socket.id,
       });
-    }, 5000);
+    }, 100);
   });
 
   socket.on('send writings', (writing) => {
-    console.log('setting', writing);
     users.set(socket.id, { ...users.get(socket.id), prevWriting: writing });
   });
 

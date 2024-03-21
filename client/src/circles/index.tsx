@@ -35,8 +35,9 @@ const START_CIRCLES: ICircle[] = [
   },
 ];
 
-const VELOCITY_BOUND = 10;
+const VELOCITY_BOUND = 1000;
 const RANDOM_CIRCLES: ICircle[] = [];
+const FRAME_RATE = 60;
 for (let i = 0; i < 10; ++i) {
   // make sure it doesnt overlap an existing circle
   let newCircle: ICircle;
@@ -63,28 +64,78 @@ const CanvasComponent: React.FC<{
   circles: ICircle[];
   setCircles: React.Dispatch<React.SetStateAction<ICircle[]>>;
 }> = ({ circles, setCircles }) => {
+  const WINDOW_HEIGHT = window.innerHeight;
+  const WINDOW_WIDTH = window.innerWidth;
+
   useEffect(() => {
     let animationFrameId: any;
 
     const update = () => {
-      setCircles((circles) =>
-        circles.map((circle) => {
-          let newX = circle.x + circle.vx;
-          let newY = circle.y + circle.vy;
+      console.log('new update');
 
-          // Bounce off the walls logic
-          if (newX > window.innerWidth || newX < 0) {
-            circle.vx *= -1;
-          }
-          if (newY > window.innerHeight || newY < 0) {
-            circle.vy *= -1;
-          }
+      const newCircles = circles.map((c) => ({ ...c }));
+      newCircles.forEach((circle, ind) => {
+        // wall boundaries
+        if (circle.x - circle.radius < 0) {
+          circle.x = circle.radius;
+          circle.vx = -circle.vx;
+        }
+        if (circle.x + circle.radius > WINDOW_WIDTH) {
+          circle.x = WINDOW_WIDTH - circle.radius;
+          circle.vx = -circle.vx;
+        }
+        if (circle.y - circle.radius < 0) {
+          circle.y = circle.radius;
+          circle.vy = -circle.vy;
+        }
+        if (circle.y + circle.radius > WINDOW_HEIGHT) {
+          circle.y = WINDOW_HEIGHT - circle.radius;
+          circle.vy = -circle.vy;
+        }
 
-          return { ...circle, x: newX, y: newY };
-        })
-      );
+        // collisions
+        // for (let otherInd = 0; otherInd < circles.length; ++otherInd) {
+        //   if (otherInd >= ind) {
+        //     break;
+        //   }
 
+        //   const otherCircle = newCircles[otherInd];
+        //   const minDist = circle.radius + otherCircle.radius;
+        //   const dist = Math.pow(
+        //     Math.pow(circle.x - otherCircle.x, 2) + Math.pow(circle.y - otherCircle.y, 2),
+        //     0.5
+        //   );
+
+        //   if (dist - minDist < 0) {
+        //     circle.color = 'red';
+        //     otherCircle.color = 'red';
+
+        //     // rebounding
+        //     [circle.vx, circle.vy, otherCircle.vx, otherCircle.vy] = [
+        //       otherCircle.vx,
+        //       otherCircle.vy,
+        //       circle.vx,
+        //       circle.vy,
+        //     ];
+        //   }
+        // }
+      });
+
+      setCircles(newCircles);
+
+      // set timeout for next frame
       animationFrameId = requestAnimationFrame(update);
+      setTimeout(() => {
+        setCircles((prevCircles) => {
+          return prevCircles.map((c) => {
+            return {
+              ...c,
+              x: c.x + c.vx / FRAME_RATE,
+              y: c.y + c.vy / FRAME_RATE,
+            };
+          });
+        });
+      }, 1000 / FRAME_RATE);
     };
 
     update();
@@ -104,7 +155,7 @@ const CanvasComponent: React.FC<{
             x={circle.x}
             y={circle.y}
             radius={circle.radius}
-            fill={circle.color}
+            fill={circle.color || '#808080'}
           />
         ))}
       </Layer>
@@ -113,130 +164,15 @@ const CanvasComponent: React.FC<{
 };
 
 const CirclesGame: React.FC = () => {
-  const canvasRef = useRef(null);
   // const [circles, setCircles] = useState(START_CIRCLES);
   const [circles, setCircles] = useState(RANDOM_CIRCLES);
+  const canvasRef = useRef(null);
   const [hasCollided, setHasCollided] = useState(false);
 
   const frameRate = 120;
 
   const WINDOW_HEIGHT = window.innerHeight;
   const WINDOW_WIDTH = window.innerWidth;
-
-  const updateCanvas = () => {
-    if (canvasRef?.current) {
-      console.log('here');
-      const canvas: HTMLCanvasElement = canvasRef.current;
-      const context = canvas.getContext('2d');
-      if (!context) {
-        return;
-      }
-
-      const update = () => {
-        // Clear canvas
-        context.clearRect(0, 0, canvas.width, canvas.height);
-
-        let hasCollision = false;
-        if (!hasCollided) {
-          // Update and draw circles
-          circles.forEach((circle, ind) => {
-            // wall boundaries
-            // make sure even if the circle is moving fast, it doesnt go through the wall and bounces off
-            if (circle.x - circle.radius < 0) {
-              circle.x = circle.radius;
-              circle.vx = -circle.vx;
-            }
-            if (circle.x + circle.radius > WINDOW_WIDTH) {
-              circle.x = WINDOW_WIDTH - circle.radius;
-              circle.vx = -circle.vx;
-            }
-            if (circle.y - circle.radius < 0) {
-              circle.y = circle.radius;
-              circle.vy = -circle.vy;
-            }
-            if (circle.y + circle.radius > WINDOW_HEIGHT) {
-              circle.y = WINDOW_HEIGHT - circle.radius;
-              circle.vy = -circle.vy;
-            }
-
-            for (let otherInd = 0; otherInd < circles.length; ++otherInd) {
-              if (otherInd >= ind) {
-                break;
-              }
-
-              const otherCircle = circles[otherInd];
-              const minDist = circle.radius + otherCircle.radius;
-              const dist = Math.pow(
-                Math.pow(circle.x - otherCircle.x, 2) + Math.pow(circle.y - otherCircle.y, 2),
-                0.5
-              );
-
-              if (dist - minDist < 0) {
-                hasCollision = true;
-                circle.color = 'red';
-                otherCircle.color = 'red';
-
-                // rebounding
-                [circle.vx, circle.vy, otherCircle.vx, otherCircle.vy] = [
-                  otherCircle.vx,
-                  otherCircle.vy,
-                  circle.vx,
-                  circle.vy,
-                ];
-              }
-            }
-
-            // Draw circle
-            context.beginPath();
-            context.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
-            context.fillStyle = circle.color || '#808080';
-            if (circle.color) {
-              context.fillStyle = '#808080';
-            }
-            // if mouse clicks circle, glow red
-            // if (hasCollided) {
-            //   context.fillStyle = 'red';
-            // }
-            context.fill();
-          });
-        }
-
-        // if (hasCollision) {
-        //   setHasCollided(true);
-        // setCircles(
-        //   circles.map((c) => {
-        //     return { ...c, vx: 0, vy: 0 };
-        //   })
-        // );
-        // }
-
-        // timer for the next tick
-        setTimeout(() => {
-          setCircles((prevCircles) => {
-            return prevCircles.map((c) => {
-              return {
-                ...c,
-                x: c.x + c.vx / frameRate,
-                y: c.y + c.vy / frameRate,
-              };
-            });
-          });
-        }, 1000 / frameRate);
-
-        // requestAnimationFrame(update);
-      };
-      update();
-    }
-  };
-
-  useEffect(() => {
-    // update();
-  }, [circles]); // Re-run effect if circles state changes
-
-  useEffect(() => {
-    console.log('updating');
-    updateCanvas();
-  });
 
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
