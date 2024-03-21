@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled from '@emotion/styled';
-import { Button } from '@mui/material';
+import { Button, IconButtonClassKey } from '@mui/material';
+import { Stage, Layer, Circle } from 'react-konva';
 
 type ICircle = {
   x: number;
@@ -57,6 +58,59 @@ for (let i = 0; i < 10; ++i) {
   );
   RANDOM_CIRCLES.push(newCircle);
 }
+
+const CanvasComponent: React.FC<{
+  circles: ICircle[];
+  setCircles: React.Dispatch<React.SetStateAction<ICircle[]>>;
+}> = ({ circles, setCircles }) => {
+  useEffect(() => {
+    let animationFrameId: any;
+
+    const update = () => {
+      setCircles((circles) =>
+        circles.map((circle) => {
+          let newX = circle.x + circle.vx;
+          let newY = circle.y + circle.vy;
+
+          // Bounce off the walls logic
+          if (newX > window.innerWidth || newX < 0) {
+            circle.vx *= -1;
+          }
+          if (newY > window.innerHeight || newY < 0) {
+            circle.vy *= -1;
+          }
+
+          return { ...circle, x: newX, y: newY };
+        })
+      );
+
+      animationFrameId = requestAnimationFrame(update);
+    };
+
+    update();
+
+    // Clean up function
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return (
+    <Stage width={window.innerWidth} height={window.innerHeight}>
+      <Layer>
+        {circles.map((circle, index) => (
+          <Circle
+            key={index}
+            x={circle.x}
+            y={circle.y}
+            radius={circle.radius}
+            fill={circle.color}
+          />
+        ))}
+      </Layer>
+    </Stage>
+  );
+};
 
 const CirclesGame: React.FC = () => {
   const canvasRef = useRef(null);
@@ -186,7 +240,8 @@ const CirclesGame: React.FC = () => {
 
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-      <canvas ref={canvasRef} width={WINDOW_WIDTH} height={WINDOW_HEIGHT} style={{}} />;
+      <CanvasComponent circles={circles} setCircles={setCircles} />
+      {/* <canvas ref={canvasRef} width={WINDOW_WIDTH} height={WINDOW_HEIGHT} style={{}} />; */}
     </div>
   );
 };
